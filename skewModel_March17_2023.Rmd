@@ -1,0 +1,1299 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This notebook provides the code for the paper: "Skewed performance distributions as evidence of motor constraint in sports and animal displays."
+
+The outline:
+ 1. build histograms from the raw sports and bird data
+ 2. build skew normal model for the marathon data
+ 3. build skew normal model for the bird data
+
+
+# 1. Build histogram of raw data
+
+```{r libraries}
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(ggridges)
+library(brms)
+library(e1071)
+```
+
+
+
+Load in the data
+
+```{r olympic data}
+
+df <- read.csv("data/olympics/olympic_results.csv")
+
+```
+
+
+100 meter dash
+
+```{r 100 dash men}
+df_althetics_100dash <- df %>% filter(grepl("Athletics", discipline_title) & grepl("100m men", event_title) & medal_type!="" ) 
+table(df_althetics_100dash$event_title)
+
+
+df_althetics_100dash$time <- as.numeric(df_althetics_100dash$value_unit)
+df_althetics_100dash<-df_althetics_100dash %>% filter(!is.na(time))
+
+skew_dash <- skewness(df_althetics_100dash$time,na.rm = T)
+
+p.dash <- ggplot(df_althetics_100dash, aes(x=time/1000 ))  +geom_density(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Density", x="100m dash men [seconds]", title=paste0("Skew=",round(skew_dash,2), ",  N = ",nrow(df_althetics_100dash)  ))
+
+p.dash_h <- ggplot(df_althetics_100dash, aes(x=time/1000 ))  +geom_histogram(fill="blue", alpha=0.5) + theme_bw() + labs(y="Count", x="Seconds", title=paste0("100m dash men"), subtitle=paste0("Skew = ",round(skew_dash,2), ",  N = ",nrow(df_althetics_100dash)  )) + theme(text = element_text(size = 25))
+
+p.dash_h
+
+
+df_althetics_100dash$year <- as.numeric(substr(df_althetics_100dash$slug_game, nchar(df_althetics_100dash$slug_game)-3, nchar(df_althetics_100dash$slug_game) ))
+
+p.dash.scatter <- ggplot(df_althetics_100dash, aes(y=time,x=year ))  +geom_point(alpha=0.5)  + theme_bw() + labs(y="Time", x="High jump [meters]", title=paste0("Skew=",round(skew_dash,2)) )
+p.dash.scatter
+```
+
+```{r 100 dash women}
+df_althetics_100dashW <- df %>% filter(grepl("Athletics", discipline_title) & grepl("100m women", event_title) & medal_type!="" ) 
+table(df_althetics_100dashW$event_title)
+
+
+df_althetics_100dashW$time <- as.numeric(df_althetics_100dashW$value_unit)
+df_althetics_100dashW<-df_althetics_100dashW %>% filter(!is.na(time))
+
+skew_dashW <- skewness(df_althetics_100dashW$time,na.rm = T)
+
+p.dashW <- ggplot(df_althetics_100dashW, aes(x=time/1000 ))  +geom_density(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Density", x="100m dash women [seconds]", title=paste0("Skew=",round(skew_dashW,2), ",  N = ",nrow(df_althetics_100dashW) ) )
+
+p.dashW_h <- ggplot(df_althetics_100dashW, aes(x=time/1000 ))  +geom_histogram(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Count", x="Seconds", title=paste0("100m dash women"), subtitle=paste0("Skew = ",round(skew_dashW,2), ",  N = ",nrow(df_althetics_100dashW) ) ) + theme(text = element_text(size = 25))
+
+p.dashW
+
+
+df_althetics_100dashW$year <- as.numeric(substr(df_althetics_100dashW$slug_game, nchar(df_althetics_100dashW$slug_game)-3, nchar(df_althetics_100dashW$slug_game) ))
+
+p.dash.scatterW <- ggplot(df_althetics_100dashW, aes(y=time,x=year ))  +geom_point(alpha=0.5)  + theme_bw() + labs(y="Time", x="High jump [meters]", title=paste0("Skew=",round(skew_dashW,2)) )
+p.dash.scatterW
+```
+
+
+long jump
+
+```{r long jump women}
+#get only the women's long jump
+df_althetics_longJ <- df %>% filter(grepl("Athletics", discipline_title) & grepl("long jump women", event_title, ignore.case = T) & medal_type!="")
+table(df_althetics_longJ$event_title)
+
+#convert char to int
+df_althetics_longJ$distance <- as.numeric(df_althetics_longJ$value_unit)
+df_althetics_longJ<-df_althetics_longJ %>% filter(!is.na(distance))
+
+#calculate skew
+skew_longJ <- skewness(df_althetics_longJ$distance,na.rm = T)
+
+#plot
+p.longJ <- ggplot(df_althetics_longJ, aes(x=distance ))  +geom_density(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Density", x="Long jump women [meters]", title=paste0("Skew=",round(skew_longJ,2), ",  N = ",nrow(df_althetics_longJ) ) )
+
+p.longJ_h <- ggplot(df_althetics_longJ, aes(x=distance ))  +geom_histogram(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Count", x="Meters", title=paste0("Long jump women"), subtitle=paste0("Skew = ",round(skew_longJ,2), ",  N = ",nrow(df_althetics_longJ) ) ) + theme(text = element_text(size = 25))
+
+p.longJ
+
+
+
+df_althetics_longJ$year <- as.numeric(substr(df_althetics_longJ$slug_game, nchar(df_althetics_longJ$slug_game)-3, nchar(df_althetics_longJ$slug_game) ))
+
+p.longJ.scatter <- ggplot(df_althetics_longJ, aes(y=distance,x=year ))  +geom_point(alpha=0.5)  + theme_bw() + labs(y="Density", x="Long jump women [meters]", title=paste0("Skew=",round(skew_longJ,2)) )
+p.longJ.scatter
+```
+
+
+```{r long jump men}
+#get only the men's long jump
+df_althetics_longJM <- df %>% filter(grepl("Athletics", discipline_title) & grepl("long jump men", event_title, ignore.case = T) & medal_type!="")
+table(df_althetics_longJM$event_title)
+
+#convert char to int
+df_althetics_longJM$distance <- as.numeric(df_althetics_longJM$value_unit)
+df_althetics_longJM<-df_althetics_longJM %>% filter(!is.na(distance))
+
+#calculate skew
+skew_longJM <- skewness(df_althetics_longJM$distance,na.rm = T)
+
+#plot
+p.longJM <- ggplot(df_althetics_longJM, aes(x=distance ))  +geom_density(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Density", x="Long jump men [meters]", title=paste0("Skew=",round(skew_longJM,2), ",  N = ",nrow(df_althetics_longJM) ) )
+
+p.longJM_h <- ggplot(df_althetics_longJM, aes(x=distance ))  +geom_histogram(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Count", x="Meters", title=paste0("Long jump men"), subtitle=paste0("Skew = ",round(skew_longJM,2), ",  N = ",nrow(df_althetics_longJM) ) ) + theme(text = element_text(size = 25))
+
+p.longJM
+
+
+
+df_althetics_longJM$year <- as.numeric(substr(df_althetics_longJM$slug_game, nchar(df_althetics_longJM$slug_game)-3, nchar(df_althetics_longJM$slug_game) ))
+
+p.longJ.scatter.m <- ggplot(df_althetics_longJM, aes(y=distance,x=year ))  +geom_point(alpha=0.5)  + theme_bw() + labs(y="Density", x="Long jump men [meters]", title=paste0("Skew=",round(skew_longJM,2)) )
+p.longJ.scatter.m
+```
+
+
+Shotput
+
+```{r shotput men}
+df_althetics_shotp <- df %>% filter(grepl("Athletics", discipline_title) & grepl("shot put men", event_title, ignore.case = T)& medal_type!="" ) 
+
+table(df_althetics_shotp$event_title)
+
+df_althetics_shotp$distance <- as.numeric(df_althetics_shotp$value_unit)
+df_althetics_shotp<-df_althetics_shotp %>% filter(!is.na(distance))
+
+skew_shotp <- skewness(df_althetics_shotp$distance,na.rm = T)
+
+p.shotP <- ggplot(df_althetics_shotp, aes(x=distance ))  +geom_density(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Density", x="Shot put men [meters]", title=paste0("Skew=",round(skew_shotp,2), ",  N = ",nrow(df_althetics_shotp)) )
+
+p.shotP_h <- ggplot(df_althetics_shotp, aes(x=distance ))  +geom_histogram(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Count", x="Meters", title=paste0("Shot put men"), subtitle=paste0("Skew = ",round(skew_shotp,2), ",  N = ",nrow(df_althetics_shotp)) ) + theme(text = element_text(size = 25))
+
+p.shotP
+
+
+df_althetics_shotp$year <- as.numeric(substr(df_althetics_shotp$slug_game, nchar(df_althetics_shotp$slug_game)-3, nchar(df_althetics_shotp$slug_game) ))
+
+p.shotP.scatter <- ggplot(df_althetics_shotp, aes(y=distance,x=year ))  +geom_point(alpha=0.5)  + theme_bw() + labs(y="Density", x="Meters", title=paste0("Shot put men"), subtitle=paste0("Skew=",round(skew_shotp,2)) )
+p.shotP.scatter
+```
+
+
+```{r shotput women}
+df_althetics_shotpW <- df %>% filter(grepl("Athletics", discipline_title) & grepl("shot put women", event_title, ignore.case = T)& medal_type!="" ) 
+
+table(df_althetics_shotpW$event_title)
+
+df_althetics_shotpW$distance <- as.numeric(df_althetics_shotpW$value_unit)
+df_althetics_shotpW<-df_althetics_shotpW %>% filter(!is.na(distance))
+
+skew_shotpW <- skewness(df_althetics_shotpW$distance,na.rm = T)
+
+p.shotPW <- ggplot(df_althetics_shotpW, aes(x=distance ))  +geom_density(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Density", x="Shot put women [meters]", title=paste0("Skew=",round(skew_shotpW,2), ",  N = ",nrow(df_althetics_shotpW)) )
+
+p.shotPW_h <- ggplot(df_althetics_shotpW, aes(x=distance ))  +geom_histogram(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Count", x="Meters", title=paste0("Shot put women"), subtitle=paste0("Skew = ",round(skew_shotpW,2), ",  N = ",nrow(df_althetics_shotpW)) ) + theme(text = element_text(size = 25))
+
+p.shotPW
+
+
+df_althetics_shotpW$year <- as.numeric(substr(df_althetics_shotpW$slug_game, nchar(df_althetics_shotpW$slug_game)-3, nchar(df_althetics_shotpW$slug_game) ))
+
+p.shotP.scatter.w <- ggplot(df_althetics_shotpW, aes(y=distance,x=year ))  +geom_point(alpha=0.5)  + theme_bw() + labs(y="Density", x="Shot put women [meters]", title=paste0("Skew=",round(skew_shotpW,2)) )
+p.shotP.scatter.w
+```
+
+10000 meter
+
+```{r 10000 meter men}
+#get only the men's long jump
+df_althetics_run <- df %>% filter(grepl("Athletics", discipline_title) & grepl("10000m men", event_title, ignore.case = T) & medal_type!="")
+table(df_althetics_run$event_title)
+
+#convert char to int
+df_althetics_run$time <- as.numeric(df_althetics_run$value_unit)
+df_althetics_run<-df_althetics_run %>% filter(!is.na(time))
+
+#calculate skew
+skew_run <- skewness(df_althetics_run$time,na.rm = T)
+
+#plot
+p.run <- ggplot(df_althetics_run, aes(x=time/(1000*60) ))  +geom_density(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Density", x="10000m run men [minutes]", title=paste0("Skew=",round(skew_run,2), ",  N = ",nrow(df_althetics_run)) )
+
+p.run_h <- ggplot(df_althetics_run, aes(x=time/(1000) ))  +geom_histogram(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Count", x="Seconds", title=paste0("10000m run men"), subtitle=paste0("Skew = ",round(skew_run,2), ",  N = ",nrow(df_althetics_run)) ) + theme(text = element_text(size = 25))
+
+p.run
+
+
+df_althetics_run$year <- as.numeric(substr(df_althetics_run$slug_game, nchar(df_althetics_run$slug_game)-3, nchar(df_althetics_run$slug_game) ))
+
+p.run.scatter <- ggplot(df_althetics_run, aes(y=time/(1000*60),x=year ))  +geom_point(alpha=0.5)  + theme_bw() + labs(y="Year", y="10000m run men [minutes]", title=paste0("Skew=",round(skew_run,2)) )
+p.run.scatter
+```
+
+```{r 10000 meter women}
+#get only the women's long jump
+df_althetics_runW <- df %>% filter(grepl("Athletics", discipline_title) & grepl("10000m women", event_title, ignore.case = T) & medal_type!="")
+table(df_althetics_runW$event_title)
+
+#convert char to int
+df_althetics_runW$time <- as.numeric(df_althetics_runW$value_unit)
+df_althetics_runW<-df_althetics_runW %>% filter(!is.na(time))
+
+#calculate skew
+skew_runW <- skewness(df_althetics_runW$time,na.rm = T)
+
+#plot
+p.runW <- ggplot(df_althetics_runW, aes(x=time/(1000*60) ))  +geom_density(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Density", x="10000m run women [minutes]", title=paste0("Skew=",round(skew_runW,2), ",  N = ",nrow(df_althetics_runW)) )
+
+p.runW_h <- ggplot(df_althetics_runW, aes(x=time/(1000) ))  +geom_histogram(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Count", x="Seconds", title=paste0("10000m run women"), subtitle=paste0("Skew = ",round(skew_runW,2), ",  N = ",nrow(df_althetics_runW)) ) + theme(text = element_text(size = 25))
+
+p.runW
+
+
+df_althetics_runW$year <- as.numeric(substr(df_althetics_runW$slug_game, nchar(df_althetics_runW$slug_game)-3, nchar(df_althetics_runW$slug_game) ))
+
+p.run.scatterW <- ggplot(df_althetics_runW, aes(y=time/(1000*60),x=year ))  +geom_point(alpha=0.5)  + theme_bw() + labs(y="Year", y="10000m run women [minutes]", title=paste0("Skew=",round(skew_runW,2)) )
+p.run.scatterW
+```
+
+
+freestyle swim
+
+```{r freestyle 100m women}
+#get only the men's long jump
+df_althetics_free <- df %>% filter(grepl("Swimming", discipline_title) & grepl("100m freestyle women", event_title, ignore.case = T) & medal_type!="")
+table(df_althetics_free$event_title)
+
+#convert char to int
+df_althetics_free$time <- as.numeric(df_althetics_free$value_unit)
+df_althetics_free<-df_althetics_free %>% filter(!is.na(time))
+
+#calculate skew
+skew_free <- skewness(df_althetics_free$time,na.rm = T)
+
+#plot
+p.free <- ggplot(df_althetics_free, aes(x=time/1000 ))  +geom_density(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Density", x="100m freestyle women [seconds]", title=paste0("Skew=",round(skew_free,2), ",  N = ",nrow(df_althetics_free)) )
+
+p.free_h <- ggplot(df_althetics_free, aes(x=time/1000 ))  +geom_histogram(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Count", x="Seconds", title=paste0("100m freestyle women"), subtitle=paste0("Skew = ",round(skew_free,2), ",  N = ",nrow(df_althetics_free)) ) + theme(text = element_text(size = 25))
+
+p.free
+
+
+df_althetics_free$year <- as.numeric(substr(df_althetics_free$slug_game, nchar(df_althetics_free$slug_game)-3, nchar(df_althetics_free$slug_game) ))
+
+p.free.scatter <- ggplot(df_althetics_free, aes(y=time,x=year ))  +geom_point(alpha=0.5)  + theme_bw() + labs(y="Year", y="Disc [meters]", title=paste0("Skew=",round(skew_free,2)) )
+p.free.scatter
+```
+
+```{r freestyle 100m men}
+#get only the men's long jump
+df_althetics_freeM <- df %>% filter(grepl("Swimming", discipline_title) & grepl("100m freestyle men", event_title, ignore.case = T) & medal_type!="")
+df_althetics_freeM <- df_althetics_freeM %>% filter(!grepl("4x", event_title, ignore.case = T))
+table(df_althetics_freeM$event_title)
+
+#convert char to int
+df_althetics_freeM$time <- as.numeric(df_althetics_freeM$value_unit)
+df_althetics_freeM<-df_althetics_freeM %>% filter(!is.na(time))
+
+#calculate skew
+skew_freeM <- skewness(df_althetics_freeM$time,na.rm = T)
+
+#plot
+p.freeM <- ggplot(df_althetics_freeM, aes(x=time/1000 ))  +geom_density(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Density", x="100m freestyle men [seconds]", title=paste0("Skew=",round(skew_freeM,2), ",  N = ",nrow(df_althetics_freeM)) )
+
+p.freeM_h <- ggplot(df_althetics_freeM, aes(x=time/1000 ))  +geom_histogram(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Count", x="Seconds", title=paste0("100m freestyle men"), subtitle=paste0("Skew = ",round(skew_freeM,2), ",  N = ",nrow(df_althetics_freeM)) ) + theme(text = element_text(size = 25))
+
+p.freeM
+
+
+df_althetics_freeM$year <- as.numeric(substr(df_althetics_freeM$slug_game, nchar(df_althetics_freeM$slug_game)-3, nchar(df_althetics_freeM$slug_game) ))
+
+p.free.scatterM <- ggplot(df_althetics_freeM, aes(y=time/1000,x=year ))  +geom_point(alpha=0.5)  + theme_bw() + labs(y="Year", y="100m freestyle men [seconds]", title=paste0("Skew = ",round(skew_freeM,2)) )
+p.free.scatterM
+```
+Marathon times (Boston)
+
+Data were taken from: https://github.com/adrian3/Boston-Marathon-Data-Project
+
+```{r}
+df_2014 <- read.csv("data/mara/results2014.csv") %>% select(age,gender,seconds)
+df_2015 <- read.csv("data/mara/results2015.csv")%>% select(age,gender,seconds)
+df_2016 <- read.csv("data/mara/results2016.csv")%>% select(age,gender,seconds)
+df_2017 <- read.csv("data/mara/results2017.csv")%>% select(age,gender,seconds)
+df_2018 <- read.csv("data/mara/results2018.csv")%>% select(age,gender,seconds)
+df_2019 <- read.csv("data/mara/results2019.csv")%>% select(age,gender,seconds)
+
+df_2014$year <- 2014
+df_2015$year <- 2015
+df_2016$year <- 2016
+df_2017$year <- 2017
+df_2018$year <- 2018
+df_2019$year <- 2019
+
+df_2015$age <- as.integer(df_2015$age)
+df_2015$seconds <- as.integer(df_2015$seconds)
+df_2017$age <- as.integer(df_2017$age)
+df_2019$seconds <- as.integer(df_2019$seconds)
+df_2019$age <- as.integer(df_2019$age)
+
+df_boston <- bind_rows(df_2014 %>% select(age,gender,seconds, year),
+                       df_2015  %>% select(age,gender,seconds, year),
+                       df_2016  %>% select(age,gender,seconds, year),
+                       df_2017  %>% select(age,gender,seconds, year),
+                       df_2018  %>% select(age,gender,seconds, year))#,
+                       #df_2019 %>% select(age,gender,seconds, year))
+
+df_boston
+
+```
+
+```{r boston mara plots}
+df_boston_f <- df_boston %>% filter(gender == "F" & !is.na(seconds))
+df_boston_m <- df_boston %>% filter(gender == "M" & !is.na(seconds) )
+
+#calculate skew
+skew_boston_f <- skewness(df_boston_f$seconds,na.rm = T)
+skew_boston_m <- skewness(df_boston_m$seconds,na.rm = T)
+
+#plot
+p.boston_f <- ggplot(df_boston_f, aes(x=seconds ))  +geom_density(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Density", x="Marathon women [seconds]", title=paste0("Skew=",round(skew_boston_f,2), ",  N = ",nrow(df_boston_f)) )
+p.boston_m <- ggplot(df_boston_m, aes(x=seconds ))  +geom_density(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Density", x="Marathon men [seconds]", title=paste0("Skew=",round(skew_boston_m,2), ",  N = ",nrow(df_boston_m)) )
+
+p.boston_f_h <- ggplot(df_boston_f, aes(x=seconds ))  +geom_histogram(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Count", x="Seconds", title=paste0("Marathon women"), subtitle=paste0("Skew=",round(skew_boston_f,2), ",  N = ",nrow(df_boston_f)) ) + theme(text = element_text(size = 25))
+p.boston_m_h <- ggplot(df_boston_m, aes(x=seconds ))  +geom_histogram(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Count", x="Seconds", title=paste0("Marathon men"), subtitle=paste0("Skew = ",round(skew_boston_m,2), ",  N = ",nrow(df_boston_m)) ) + theme(text = element_text(size = 25))
+
+#check time
+#p.boston.scatter <- ggplot(df_boston, aes(y=seconds,x=year ))  +geom_point(alpha=0.5)  + theme_bw() + labs(y="Year", y="Marathon [seconds]" )
+#p.boston.scatter
+```
+
+Bird data
+
+```{r load bird data}
+
+df_birds <- read.csv("data/Devsc_12_17_Jan2023.csv")
+
+df_birds$Bird <- df_birds$Bird.x
+
+df_birds
+```
+
+```{r bird gaplength}
+
+#calculate skew
+skew_gap <- skewness(df_birds$GapLenPerf.05 ,na.rm = T)
+df_birds <- df_birds %>% filter(!is.na(GapLenPerf.05) )
+summary(df_birds)
+
+#plot
+p.bird.gap <- ggplot(df_birds, aes(x=GapLenPerf.05  ))  +geom_density(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Density", x="Bird song: Recovery time", title=paste0("Skew=",round(skew_gap,2), ",  N = ",nrow(df_birds)) )
+
+
+p.bird.gap_h <- ggplot(df_birds, aes(x=GapLenPerf.05  ))  +geom_histogram(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Count", x="Recovery time", title=paste0("Bird Song:"), subtitle=paste0("Skew = ",round(skew_gap,2), ",  N = ",nrow(df_birds)) ) + theme(text = element_text(size = 25))
+
+p.bird.gap
+
+```
+
+```{r bird LengthBWPerf}
+
+#calculate skew
+skew_vfm <- skewness(df_birds$LengthBWPerf.05,na.rm = T)
+
+#plot
+p.bird.vfm <- ggplot(df_birds, aes(x=LengthBWPerf.05 ))  +geom_density(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Density", x="Bird song: Voiced FM", title=paste0("Skew=",round(skew_vfm,2), ",  N = ",nrow(df_birds)) )
+
+
+p.bird.vfm_h <- ggplot(df_birds, aes(x=LengthBWPerf.05 ))  +geom_histogram(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Count", x="Voiced FM", title=paste0("Bird Song:"), subtitle=paste0("Skew = ",round(skew_vfm,2), ",  N = ",nrow(df_birds)) ) + theme(text = element_text(size = 25))
+
+p.bird.vfm
+
+```
+
+```{r bird GapAfterGapBWPerf}
+
+#calculate skew
+skew_ufm <- skewness(df_birds$GapAfterGapBWPerf.05,na.rm = T)
+
+#plot
+p.bird.ufm <- ggplot(df_birds, aes(x=GapAfterGapBWPerf.05 ))  +geom_density(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Density", x="Unvoiced FM", title=paste0("Bird Song"), subtitle=paste0("Skew=",round(skew_ufm,2), ",  N = ",nrow(df_birds)) )
+
+
+p.bird.ufm_h <- ggplot(df_birds, aes(x=GapAfterGapBWPerf.05 ))  +geom_histogram(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Count", x="Unvoiced FM", title=paste0("Bird Song:"), subtitle=paste0("Skew = ",round(skew_ufm,2), ",  N = ",nrow(df_birds)) ) + theme(text = element_text(size = 25))
+
+p.bird.ufm
+```
+
+
+View all plots together
+
+```{r facet plot density}
+cowplot::plot_grid(p.dash,p.dashW,p.run,p.runW,p.longJ,p.longJM,p.shotP,p.shotPW, p.free, p.freeM, p.boston_m,p.boston_f, labels = c("a)","b)","c)","d)","e)","f)","g)","h)","i)","j)","k)","l)"))
+
+#ordered
+cowplot::plot_grid(p.shotPW, p.longJ, p.longJM, p.shotP, p.runW, p.run, p.dashW,  p.boston_m,p.boston_f, p.free,p.dash,p.bird.vfm,p.freeM, p.bird.ufm, p.bird.gap  , labels = c("a)","b)","c)","d)","e)","f)","g)","h)","i)","j)","k)","l)","m)","n)","o)"), ncol = 3)
+
+#ordered and histo
+cowplot::plot_grid(p.shotPW_h, p.longJ_h, p.longJM_h, p.shotP_h, p.runW_h, p.run_h, p.dashW_h,  p.boston_m_h,p.boston_f_h, p.free_h,p.dash_h,p.bird.vfm_h,p.freeM_h, p.bird.ufm_h, p.bird.gap_h , labels = c("a)","b)","c)","d)","e)","f)","g)","h)","i)","j)","k)","l)","m)","n)","o)"), ncol = 3)
+
+#ordered and histo
+cowplot::plot_grid(p.shotPW_h, p.longJ_h + labs(y=""), p.free_h+ labs(y=""),
+                   p.shotP_h, p.longJM_h+ labs(y=""), p.freeM_h+ labs(y=""),
+                   p.boston_f_h, p.runW_h+ labs(y=""), p.dashW_h+ labs(y=""),
+                   p.boston_m_h, p.run_h+ labs(y=""), p.dash_h+ labs(y=""),
+                   p.bird.gap_h, p.bird.vfm_h+ labs(y=""), p.bird.ufm_h + labs(y=""), labels = "AUTO", ncol = 3)
+
+
+
+
+
+```
+
+
+# 2. Skew normal model for marathon data
+
+Using marathon times (Boston)
+
+```{r}
+df_2014 <- read.csv("data/mara/results2014.csv") %>% select(age,gender,seconds)
+df_2015 <- read.csv("data/mara/results2015.csv")%>% select(age,gender,seconds)
+df_2016 <- read.csv("data/mara/results2016.csv")%>% select(age,gender,seconds)
+df_2017 <- read.csv("data/mara/results2017.csv")%>% select(age,gender,seconds)
+df_2018 <- read.csv("data/mara/results2018.csv")%>% select(age,gender,seconds)
+df_2019 <- read.csv("data/mara/results2019.csv")%>% select(age,gender,seconds)
+
+df_2014$year <- 2014
+df_2015$year <- 2015
+df_2016$year <- 2016
+df_2017$year <- 2017
+df_2018$year <- 2018
+df_2019$year <- 2019
+
+
+
+df_2015$age <- as.integer(df_2015$age)
+df_2015$seconds <- as.integer(df_2015$seconds)
+df_2017$age <- as.integer(df_2017$age)
+df_2019$seconds <- as.integer(df_2019$seconds)
+df_2019$age <- as.integer(df_2019$age)
+
+df_boston <- bind_rows(df_2014 %>% select(age,gender,seconds, year),
+                       df_2015  %>% select(age,gender,seconds, year),
+                       df_2016  %>% select(age,gender,seconds, year),
+                       df_2017  %>% select(age,gender,seconds, year),
+                       df_2018  %>% select(age,gender,seconds, year),
+                       df_2019 %>% select(age,gender,seconds, year))
+
+df_boston
+
+```
+
+```{r}
+#install.packages("cmdstanr", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
+library(cmdstanr)
+#install_cmdstan()
+```
+
+
+Baseline  model
+
+```{r baseline model}
+
+df_2014$seconds.s <- scale(df_2014$seconds)
+
+#store scaled values for later
+seconds_scaled_sd <- attr(scale(df_2014$seconds),"scaled:scale")
+seconds_scaled_mean <-attr(scale(df_2014$seconds),"scaled:center")
+
+#build formula
+bf_skew <- bf(seconds.s ~ 1 , sigma ~ 1  , alpha ~ 1 , family="skew_normal")
+
+#check and set priors
+my_priors<-get_prior(bf_skew, data= df_2014)
+
+#run the model
+fit.mara.base <- brm(bf_skew, data=df_2014, iter = 2000, chains=4, cores = 4, prior = my_priors, backend = "cmdstanr", threads = threading(2))
+
+#check the summary
+summary(fit.mara.base)
+
+```
+
+```{r posterior checks boston}
+pp_check(fit.mara.base)
+```
+
+
+Simple model
+
+```{r}
+df_2014$year.f <- as.factor(df_2014$year)
+df_2014$seconds.s <- scale(df_2014$seconds)
+df_2014$age.s <- scale(df_2014$age)
+
+#store scaled values for later
+age_scaled_sd <- attr(scale(df_2014$age),"scaled:scale")
+age_scaled_mean <-attr(scale(df_2014$age),"scaled:center")
+seconds_scaled_sd <- attr(scale(df_2014$seconds),"scaled:scale")
+seconds_scaled_mean <-attr(scale(df_2014$seconds),"scaled:center")
+
+#build formula
+bf_skew <- bf(seconds.s ~ 1 + gender + age.s , sigma ~ 1  , alpha ~ 1 , family="skew_normal")
+
+#check and set priors
+my_priors<-get_prior(bf_skew, data= df_2014)
+my_priors[1,1] <- "normal(0,1)"
+my_priors[5,1] <- "normal(0,10)"
+
+#run the model
+fit.mara <- brm(bf_skew, data=df_2014, iter = 2000, chains=4, cores = 4, prior = my_priors, backend = "cmdstanr", threads = threading(2))
+
+#check the summary
+summary(fit.mara)
+```
+
+Simple model + alpha
+
+```{r}
+df_2014$year.f <- as.factor(df_2014$year)
+df_2014$seconds.s <- scale(df_2014$seconds)
+df_2014$age.s <- scale(df_2014$age)
+
+age_scaled_sd <- attr(scale(df_2014$age), "scaled:scale")
+age_scaled_mean <- attr(scale(df_2014$age), "scaled:center")
+
+#build formula
+bf_skew <- bf(seconds.s ~ 1 + gender + age.s , sigma ~ 1  , alpha ~ 1 + gender + age.s, family="skew_normal")
+
+#check and set priors
+my_priors<-get_prior(bf_skew, data= df_2014)
+my_priors[1,1] <- "normal(0,1)"
+my_priors[5,1] <- "normal(0,1)"
+my_priors[8,1] <- "normal(0,10)"
+
+#run the model
+fit.mara.alpha <- brm(bf_skew, data=df_2014, iter = 2000, chains=4, cores = 4, prior = my_priors, backend = "cmdstanr", threads = threading(2))
+
+#check the summary
+summary(fit.mara.alpha)
+```
+
+
+```{r}
+pp_check(fit.mara.alpha)
+```
+
+
+Compare the models 
+
+```{r}
+loo_compare(loo(fit.mara),loo(fit.mara.alpha)) 
+```
+
+Calculate the constraint line 
+
+```{r  constraint line function}
+
+# function to calculate the constraint line (fit is the model, span is the range to calculate the constraint line over on the x-axis e.g., -4,4 )
+constraint_line_base <- function(fit, span=4){
+    
+  #get posterior samples for parameters
+  post <- as_draws_df(fit, ndraws=10)
+  alpha <- post$b_alpha_Intercept 
+  intercept <-  post$Intercept 
+  sigma <- exp(post$b_sigma_Intercept)
+  
+  #convert alpha
+  delta = alpha / sqrt(1 + alpha^2);
+  omega = sigma / (sqrt(1 - sqrt(2 / pi)^2 * delta^2) );
+
+  #use it to calculate mu
+  mu = intercept - omega * delta * sqrt(2 / pi)
+  
+  #create array
+  array_post <- matrix(c(alpha,intercept,sigma,delta,omega,mu),ncol = 6,nrow=length(alpha), dimnames = list(NULL,c("alpha","intercept","sigma","delta","omega","mu")) )
+  
+  
+  #get the erf function
+  erf_part <- function(array_post,i,y){
+   return (1 + erf(array_post[i,"alpha"]*( (y - array_post[i,"mu"])/(array_post[i,"omega"]* sqrt(2) ) ) ) )
+  }
+  
+  norm_part <- function(array_post,i,y){
+   return ( (1/(array_post[i,"omega"]*sqrt(2*pi))) * exp(-0.5*(  ((y-array_post[i,"mu"])/(array_post[i,"omega"]))^2  )) )
+  }
+  
+  df_plots <- data.frame()
+  for(i in 1:30){
+    for(y in seq(from=-span,to=span,by=0.01) ){
+      cons<-erf_part(array_post,i,y)  
+      norm<-norm_part(array_post,i,y)  
+      full_skew <- dskew_normal(x=y, mu=mean(array_post[,"intercept"]), sigma =  mean(array_post[,"sigma"]), alpha=mean(array_post[,"alpha"]))
+      df_plots <- bind_rows(df_plots, data.frame(norm=norm,cons=(2-cons)/(2-0),skew=full_skew, i=i,y=y) )
+    }
+  }
+  
+  return(df_plots)
+}
+
+```
+
+Plot the constraint line
+```{r plot const line boston}
+
+#choose which model to use
+fit<-fit.mara.base
+
+#### Now get a constraint line for males/females and 20/40 year olds
+df_temp <- constraint_line_base(fit)
+
+#### Now plot it all
+df_temp$time_unscaled <- (df_temp$y*seconds_scaled_sd) + seconds_scaled_mean
+
+#plot
+p.const.mara.base <- ggplot(df_temp, aes(x=time_unscaled/60, y=cons, group=i ) ) + geom_line(alpha=0.1, color="red") + theme_bw() + labs(x="Marathon time [minutes]", y="Constraint [0-1]", color="Runner category") + geom_line(aes(x=time_unscaled/60, y = skew), alpha=0.1, color="blue")
+
+#take a look
+p.const.mara.base
+```
+
+
+Build constraint line function accounting for gender and age
+```{r  constraint line for gender and age}
+
+constraint_line_simple <- function(fit, gender, age, span=4){
+    
+  #get posterior samples for parameters (add effects of age and gender)
+  post <- as_draws_df(fit, ndraws=10)
+  alpha <- post$b_alpha_Intercept + gender*post$b_alpha_genderM + age*post$b_alpha_age.s
+  intercept <-  post$Intercept + gender*post$b_genderM + age*post$b_age.s
+  sigma <- exp(post$b_sigma_Intercept)
+  
+  #convert alpha
+  delta = alpha / sqrt(1 + alpha^2);
+  omega = sigma / (sqrt(1 - sqrt(2 / pi)^2 * delta^2) );
+
+  #use it to calculate mu
+  mu = intercept - omega * delta * sqrt(2 / pi)
+  
+  #create array
+  array_post <- matrix(c(alpha,intercept,sigma,delta,omega,mu),ncol = 6,nrow=length(alpha), dimnames = list(NULL,c("alpha","intercept","sigma","delta","omega","mu")) )
+  
+  
+  #get the erf function
+  erf_part <- function(array_post,i,y){
+   return (1 + erf(array_post[i,"alpha"]*( (y - array_post[i,"mu"])/(array_post[i,"omega"]* sqrt(2) ) ) ) )
+  }
+  
+  norm_part <- function(array_post,i,y){
+   return ( (1/(array_post[i,"omega"]*sqrt(2*pi))) * exp(-0.5*(  ((y-array_post[i,"mu"])/(array_post[i,"omega"]))^2  )) )
+  }
+  
+  df_plots <- data.frame()
+  for(i in 1:30){
+    for(y in seq(from=-span,to=span,by=0.01) ){
+      cons<-erf_part(array_post,i,y)  
+      norm<-norm_part(array_post,i,y)  
+      full_skew <- dskew_normal(x=y, mu=mean(array_post[,"intercept"]), sigma =  mean(array_post[,"sigma"]), alpha=mean(array_post[,"alpha"]))
+      df_plots <- bind_rows(df_plots, data.frame(norm=norm,cons=(2-cons)/(2-0),skew=full_skew, i=i,y=y, age=age, gender=gender) )
+    }
+  }
+  
+  return(df_plots)
+}
+
+
+```
+
+Plot the constraint line for age and gender
+
+```{r plot the constraint line for age and gender}
+
+#choose a model
+fit<-fit.mara.alpha
+
+#### Now get a constraint line for males/females and 20/40 year olds
+age_s_20 <- (20-age_scaled_mean) / age_scaled_sd
+age_s_60 <- (40-age_scaled_mean) / age_scaled_sd
+
+#calculate constraint line for each category of runner
+df_temp_Mara <- constraint_line_simple(fit, age = age_s_20, gender=0)
+df_temp_Mara <- bind_rows(df_temp_Mara, constraint_line_simple(fit, age = age_s_20, gender=1) )
+df_temp_Mara <- bind_rows(df_temp_Mara, constraint_line_simple(fit, age = age_s_60, gender=0) )
+df_temp_Mara <- bind_rows(df_temp_Mara, constraint_line_simple(fit, age = age_s_60, gender=1) )
+
+#### Now plot it all
+df_temp_Mara$age_block <- ifelse(df_temp_Mara$age==age_s_20, "20","60")
+df_temp_Mara$gender_block <- ifelse(df_temp_Mara$gender==1, "Male","Female")
+df_temp_Mara$group <- paste0(df_temp_Mara$gender_block ," ", df_temp_Mara$age_block)
+df_temp_Mara$group_line <- paste0(df_temp_Mara$gender_block ," ", df_temp_Mara$age_block, " ", df_temp_Mara$i)
+df_temp_Mara$time_unscaled <- (df_temp_Mara$y*seconds_scaled_sd) + seconds_scaled_mean
+
+#plot
+p.const.mara <- ggplot(df_temp_Mara, aes(x=time_unscaled/60, y=cons, color=factor(group), group=group_line ) ) + geom_line(alpha=0.3) + theme_bw() + labs(x="Marathon time [minutes]", y="Constraint [0-1]", color="Runner category")
+
+#take a look
+p.const.mara
+```
+
+
+Mean constraint line for each category
+
+```{r const plot mara means}
+
+df_temp_Mara$group_time <- paste0(df_temp_Mara$group, "_", df_temp_Mara$y)
+
+df_temp_Mara_sum <- df_temp_Mara %>% group_by(group_time) %>% summarise(mu = mean(cons), lower=HDInterval::hdi(cons)[1] , upper=HDInterval::hdi(cons)[2], group=first(group), time_unscaled = first(time_unscaled) )
+
+p.const.mara.sum <- ggplot(df_temp_Mara_sum, aes(x=time_unscaled/60, y=mu, ymin=lower, ymax=upper) ) + geom_line(aes(color=factor(group)) ) + geom_ribbon(aes(fill=factor(group)), alpha=0.5) + theme_bw() + labs(x="Marathon time [minutes]", y="Constraint [0-1]", color="Runner category", fill="Runner category")
+
+p.const.mara.sum
+
+```
+
+Calculate where individual runs fall on the constraint line
+
+```{r challenge of each run}
+
+#function to calculate where a point falls on the error function
+calc_erf <- function(obs, minC=0,maxC=2,alpha,mu,omega){
+  perf <- (maxC - (1 + erf(alpha*( (y - mu)/(omega* sqrt(2) ) ) )) )  / maxC
+  return(perf)
+} 
+
+
+#create a function to calculate the performance based on the constraint line (error function)
+calc_perf <- function(obs, post, samples=100){
+  
+  #performance vector
+  df_perform <- data.frame()
+  
+  #get the rows/samples for each obs
+  rowNum <- sample(1:nrow(post),size=samples )
+  
+  #for each obs
+  for(i in 1:length(obs) ){
+    
+    #calculate a new perf vector
+    perf_vec <- vector()
+    
+    #for each row/sample get an estimate
+    for(row in rowNum){
+      
+      #calculate the performance 
+      perf_vec[length(perf_vec)+1] <- (2-erf_part(array_post=post,i=row,y=obs[i]))/2
+      
+    }
+    
+    #add to performance dataframe
+    df_perform_temp1 <- data.frame(obs=obs[i])
+    df_perform_temp2 <- as.data.frame(t(perf_vec))
+    df_perform_temp <- df_perform_temp1 %>% bind_cols(df_perform_temp2)
+    
+    df_perform <- df_perform %>% bind_rows(df_perform_temp)
+    
+  }
+  
+  return(df_perform)
+  
+}
+
+
+
+#calculate the constraint at each point
+df_perf <-calc_perf(obs=fit.mara.alpha$data$seconds.s[sample(1:nrow(fit.mara.alpha$data), size=400)], post=array_post, samples=1)
+
+plot(x=df_perf$obs, y=df_perf$V1)
+
+```
+
+
+
+# 3. Skew normal model for bird song data
+
+```{r bird data}
+
+#scale the outcome variable
+df_birds$gap <- scale(df_birds$GapLenPerf.05)
+
+#for backscaling later
+gap_scaled_sd <- attr(scale(df_birds$GapLenPerf.05),"scaled:scale")
+gap_scaled_mu <- attr(scale(df_birds$GapLenPerf.05),"scaled:center")
+
+#create numeric values for birds
+df_birds$Bird <- as.numeric(as.factor(df_birds$Bird.x))
+df_birds$bird_f <- as.factor(df_birds$Bird.x)
+
+#take a look
+df_birds
+```
+
+
+
+Model the bird perf data
+```{r bird model simple}
+
+#look only before dawn
+df_birds_beforeDawn <- df_birds %>% filter(TimeRelSun.round5 <= 0)
+
+#Get the time scaled
+df_birds_beforeDawn$time <- scale(df_birds_beforeDawn$TimeRelSun.round5)
+
+#for backscaling later
+time_scaled_sd <- attr(scale(df_birds_beforeDawn$TimeRelSun.round5),"scaled:scale")
+time_scaled_mu <- attr(scale(df_birds_beforeDawn$TimeRelSun.round5),"scaled:center")
+
+
+#build formula
+bf_skew <- bf(gap ~ 1 + time + (1|Bird/SongID.x) , sigma ~ 1  , alpha ~ 1 , family="skew_normal")
+
+#check and set priors
+my_priors<-get_prior(bf_skew, data= df_birds)
+my_priors[1,1] <- "normal(0,1)"
+
+
+#run the model
+fit.gap <- brm(bf_skew, data=df_birds_beforeDawn, iter = 2000, chains=4, cores = 4, prior = my_priors, backend = "cmdstanr", threads = threading(2))
+
+#check the summary
+summary(fit.gap)
+```
+
+Posterior check
+```{r}
+pp_check(fit.gap)
+```
+
+
+Simple + alpha
+```{r}
+
+#build formula
+bf_skew <- bf(gap ~ 1 + time + (1|Bird/SongID.x)  , sigma ~ 1  , alpha ~ 1 + time + (1|Bird/SongID.x), family="skew_normal")
+
+#check and set priors
+my_priors<-get_prior(bf_skew, data= df_birds)
+my_priors[1,1] <- "student_t(3,0,1)"
+my_priors[3,1] <- "student_t(3,-0.1,1)"
+my_priors[4,1] <- "student_t(3,0,1)"
+my_priors[9,1] <- "student_t(3,0,1)"
+my_priors[12,1] <- "student_t(3,0,1)"
+my_priors[17,1] <- "student_t(3,0,1)"
+
+
+#run the model
+fit.gap.alpha <- brm(bf_skew, data=df_birds_beforeDawn, iter = 2000, chains=4, cores = 4, prior = my_priors, backend = "cmdstanr", threads = threading(2))
+
+#check the summary
+summary(fit.gap.alpha)
+```
+
+
+Posterior check
+```{r}
+pp_check(fit.gap.alpha)
+```
+Compare models
+
+```{r}
+loo_gap <- loo(fit.gap)
+loo_gap_alpha <- loo(fit.gap.alpha)
+
+loo_bird <- loo_compare(loo_gap, loo_gap_alpha )
+loo_bird
+```
+
+
+Plot constraint line for each bird
+
+```{r bird constraint lines}
+
+#build constraint model for a particular bird
+constraint_line_simple_bird <- function(fit, bird, span=4,reps=1){
+    
+  #get posterior samples for parameters (use bird ID to update estimates)
+  post <- as_draws_df(fit, ndraws=10)
+  para_name1 <- paste0("r_Bird__alpha[",bird,",Intercept]")
+  para_name2 <- paste0("r_Bird[",bird,",Intercept]")
+  alpha <- post$b_alpha_Intercept + as_draws_df(fit, ndraws=10, variable = bird, regex = T)[[para_name1]]
+  intercept <-  post$Intercept + as_draws_df(fit, ndraws=10, variable = bird, regex = T)[[para_name2]]
+  sigma <- exp(post$b_sigma_Intercept)
+  
+  #convert alpha
+  delta = alpha / sqrt(1 + alpha^2);
+  omega = sigma / (sqrt(1 - sqrt(2 / pi)^2 * delta^2) );
+
+  #use it to calculate mu
+  mu = intercept - omega * delta * sqrt(2 / pi)
+  
+  #create array
+  array_post <- matrix(c(alpha,intercept,sigma,delta,omega,mu),ncol = 6,nrow=length(alpha), dimnames = list(NULL,c("alpha","intercept","sigma","delta","omega","mu")) )
+  
+  
+  #get the erf function
+  erf_part <- function(array_post,i,y){
+   return (1 + erf(array_post[i,"alpha"]*( (y - array_post[i,"mu"])/(array_post[i,"omega"]* sqrt(2) ) ) ) )
+  }
+  
+  norm_part <- function(array_post,i,y){
+   return ( (1/(array_post[i,"omega"]*sqrt(2*pi))) * exp(-0.5*(  ((y-array_post[i,"mu"])/(array_post[i,"omega"]))^2  )) )
+  }
+  
+  df_plots <- data.frame()
+  for(i in 1:reps){
+    for(y in seq(from=-span,to=span,by=0.01) ){
+      cons<-erf_part(array_post,i,y)  
+      norm<-norm_part(array_post,i,y)  
+      full_skew <- dskew_normal(x=y, mu=mean(array_post[,"intercept"]), sigma =  mean(array_post[,"sigma"]), alpha=mean(array_post[,"alpha"]))
+      df_plots <- bind_rows(df_plots, data.frame(norm=norm,cons=(2-cons)/(2-0),skew=full_skew, i=i,y=y, bird=bird) )
+    }
+  }
+  
+  return(df_plots)
+}
+
+```
+
+Plot the constraint line for birds
+```{r}
+#choose model
+fit<-fit.gap.alpha
+
+#which birds have the most data
+sort(table(df_birds$Bird)) #>6000 observations
+
+#### Now get a constraint line for each bird
+df_temp <- constraint_line_simple_bird(fit, bird = 18, reps=30)
+df_temp <- bind_rows(df_temp, constraint_line_simple_bird(fit, bird = 2, reps=30) )
+df_temp <- bind_rows(df_temp, constraint_line_simple_bird(fit, bird = 14, reps=30) )
+df_temp <- bind_rows(df_temp, constraint_line_simple_bird(fit, bird = 17, reps=30) )
+df_temp <- bind_rows(df_temp, constraint_line_simple_bird(fit, bird = 9, reps=30) )
+
+#### Now plot it all
+df_temp$bird_f <- factor(df_temp$bird)
+df_temp$group <- paste0(df_temp$i,"_",df_temp$bird)
+
+
+p.const.birds <- ggplot(df_temp, aes(x=((y*gap_scaled_sd)+gap_scaled_mu), y=cons, group=group,color=bird_f ) ) + geom_line(alpha=0.3) + theme_bw() + labs(x="PeakFreqGapRatio", y="Constraint [0-1]", color="Bird")
+p.const.birds
+
+#mean line and CIs
+
+df_temp$timepoint <- paste0(df_temp$i,"_",df_temp$bird)
+
+df_temp$groupOut <- paste0(df_temp$y,"_",df_temp$bird)
+
+df_temp_summ <- df_temp %>% group_by(groupOut) %>% summarise(meanGAP = mean(cons), lower=HDInterval::hdi(cons)[1], upper=HDInterval::hdi(cons)[2], bird_f=first(bird_f), y=first(y) )
+
+#plot
+p.const.birds.m <- ggplot(df_temp_summ %>% filter(bird_f != "6"), aes(x=((y*gap_scaled_sd)+gap_scaled_mu), y=meanGAP, group=bird_f, ymin=lower, ymax=upper) ) + geom_line(alpha=1, aes(color=bird_f)) + geom_ribbon(aes(fill=bird_f), alpha=0.15) + theme_bw() + labs(x="Gap length performance", y="Constraint [0-1]", color="Bird", fill="Bird")
+
+#take a look
+p.const.birds.m
+```
+
+
+Performance of individual songs
+
+```{r show performance birds by time of day}
+
+#build function to calculate constraint line at different times of day
+constraint_line_simple_bird_time <- function(fit, time, bird,span=4,reps=1){
+    
+  #get posterior samples for parameters (use time to estimate alpha and intercept values)
+  post <- as_draws_df(fit, ndraws=10)
+  
+  para_name1 <- paste0("r_Bird__alpha[",bird,",Intercept]")
+  para_name2 <- paste0("r_Bird[",bird,",Intercept]")
+  
+  alpha <- post$b_alpha_Intercept + time*as_draws_df(fit, ndraws=10, variable="b_alpha_time")$b_alpha_time + as_draws_df(fit, ndraws=10, variable = bird, regex = T)[[para_name1]]
+  intercept <-  post$Intercept + time*as_draws_df(fit, ndraws=10, variable="b_time")$b_time + as_draws_df(fit, ndraws=10, variable = bird, regex = T)[[para_name2]]
+  sigma <- exp(post$b_sigma_Intercept)
+  
+  #convert alpha
+  delta = alpha / sqrt(1 + alpha^2);
+  omega = sigma / (sqrt(1 - sqrt(2 / pi)^2 * delta^2) );
+
+  #use it to calculate mu
+  mu = intercept - omega * delta * sqrt(2 / pi)
+  
+  #create array
+  array_post <- matrix(c(alpha,intercept,sigma,delta,omega,mu),ncol = 6,nrow=length(alpha), dimnames = list(NULL,c("alpha","intercept","sigma","delta","omega","mu")) )
+  
+  
+  #get the erf function
+  erf_part <- function(array_post,i,y){
+   return (1 + erf(array_post[i,"alpha"]*( (y - array_post[i,"mu"])/(array_post[i,"omega"]* sqrt(2) ) ) ) )
+  }
+  
+  norm_part <- function(array_post,i,y){
+   return ( (1/(array_post[i,"omega"]*sqrt(2*pi))) * exp(-0.5*(  ((y-array_post[i,"mu"])/(array_post[i,"omega"]))^2  )) )
+  }
+  
+  df_plots <- data.frame()
+  for(i in 1:reps){
+    for(y in seq(from=-span,to=span,by=0.01) ){
+      cons<-erf_part(array_post,i,y)  
+      norm<-norm_part(array_post,i,y)  
+      full_skew <- dskew_normal(x=y, mu=mean(array_post[,"intercept"]), sigma =  mean(array_post[,"sigma"]), alpha=mean(array_post[,"alpha"]))
+      df_plots <- bind_rows(df_plots, data.frame(norm=norm,cons=(2-cons)/(2-0),skew=full_skew, i=i,y=y, bird=bird, time = time) )
+    }
+  }
+  
+  return(df_plots)
+}
+
+
+```
+
+Plot constraint line for different times of the day
+```{r}
+
+#choose model
+fit<-fit.gap.alpha
+
+#what range should we used for time?
+summary(df_birds_beforeDawn$time)
+(time_scaled_sd*-2.65561+time_scaled_mu)/60
+(60*-40-time_scaled_mu)/time_scaled_sd
+(60*-0-time_scaled_mu)/time_scaled_sd
+
+(-0.4050945*3615.064+1459.748)/60  #back scale!
+(60*0-1459.748)/3615.064 #scale!
+
+#### Now get a constraint line for each time point
+df_temp <- constraint_line_simple_bird_time(fit, time = -2.542549, bird=2, reps=100)
+df_temp <- bind_rows(df_temp, constraint_line_simple_bird_time(fit, time = 1.979859, bird=2, reps=100) )
+
+#### Now plot it all
+df_temp$group <- paste0(df_temp$i,"_",df_temp$time)
+df_temp$time_rel_sun <- df_temp$time * time_scaled_sd + time_scaled_mu
+df_temp$time_rel_sun_f <- factor(round(df_temp$time_rel_sun/60) )
+
+p.const.birds.time <- ggplot(df_temp, aes(x=((y*gap_scaled_sd)+gap_scaled_mu), y=cons, group=factor(group),color=factor(round(time_rel_sun/60) ) ) ) + geom_line(alpha=0.03) + theme_bw() + labs(x="Gap length performance", y="Constraint [0-1]", color="Time Relative to sunrise [minutes]")
+
+#get mean and 95CIs for each time
+df_temp$group_time <- paste0(df_temp$y,"_",df_temp$time_rel_sun_f)
+library(tidyr)
+df_temp_sum <- df_temp %>% group_by(group_time) %>% summarise(meanp = mean(cons), lower=HDInterval::hdi(cons)[1], upper=HDInterval::hdi(cons)[2], go=group_time[1] ) %>% separate(go, sep="_", into=c("y","time_rel_sun"))
+
+df_temp_sum$y <- as.numeric(df_temp_sum$y)
+df_temp_sum$y <- df_temp_sum$y*gap_scaled_sd+gap_scaled_mu
+
+df_temp_sum <- df_temp_sum %>% arrange(time_rel_sun,y)
+
+#plot
+p.const.birds.time.sum <- ggplot(df_temp_sum %>% filter(time_rel_sun<45), aes(x=y, y=meanp, ymin=lower, ymax=upper, group=time_rel_sun)) + geom_line(aes(color=time_rel_sun),alpha=1) + geom_ribbon(aes(fill=time_rel_sun), alpha=0.2) + theme_bw() + labs(x="Gap length performance", y="Constraint [0-1]", color="Time [minutes]", fill="Time [minutes]")
+
+#take a look
+p.const.birds.time.sum
+
+```
+
+
+
+
+Plot all contraint lines
+
+```{r plot both constraints}
+
+cowplot::plot_grid(p.const.mara.sum+xlim(90,230)+ guides(colour = guide_legend(override.aes = list(alpha = 1)))
+                   ,p.const.birds.m+ guides(colour = guide_legend(override.aes = list(alpha = 1))) + xlim(-12,12),
+                   p.const.birds.time.sum+ guides(colour = guide_legend(override.aes = list(alpha = 1)))+ xlim(-12,12),
+                   labels=c("a)","b)","c)"), cols=1)
+
+```
+
+Calculate the challenge of each song
+```{r show challenge birds}
+
+
+#function to calculate where a point falls on the error function
+calc_erf <- function(obs, minC=0,maxC=2,alpha,mu,omega){
+  perf <- (maxC - (1 + erf(alpha*( (y - mu)/(omega* sqrt(2) ) ) )) )  / maxC
+  return(perf)
+} 
+
+
+#create a function to calculate the performance based on the constraint line (error function)
+calc_perf <- function(obs, post, samples=100){
+  
+  #performance vector
+  df_perform <- data.frame()
+  
+  #get the rows/samples for each obs
+  rowNum <- sample(1:nrow(post),size=samples )
+  
+  #for each obs
+  for(i in 1:length(obs) ){
+    
+    #calculate a new perf vector
+    perf_vec <- vector()
+    
+    #for each row/sample get an estimate
+    for(row in rowNum){
+      
+      #calculate the performance 
+      perf_vec[length(perf_vec)+1] <- (2-erf_part(array_post=post,i=row,y=obs[i]))/2
+      
+    }
+    
+    #add to performance dataframe
+    df_perform_temp1 <- data.frame(obs=obs[i])
+    df_perform_temp2 <- as.data.frame(t(perf_vec))
+    df_perform_temp <- df_perform_temp1 %>% bind_cols(df_perform_temp2)
+    
+    df_perform <- df_perform %>% bind_rows(df_perform_temp)
+    
+  }
+  
+  return(df_perform)
+  
+}
+
+
+performance_simple_bird <- function(fit, bird, obs,samples=1){
+    
+  #get posterior samples for parameters
+  post <- as_draws_df(fit, ndraws=10)
+  para_name1 <- paste0("r_Bird__alpha[",bird,",Intercept]")
+  para_name2 <- paste0("r_Bird[",bird,",Intercept]")
+  alpha <- post$b_alpha_Intercept + as_draws_df(fit, ndraws=10, variable = bird, regex = T)[[para_name1]]
+  intercept <-  post$Intercept + as_draws_df(fit, ndraws=10, variable = bird, regex = T)[[para_name2]]
+  sigma <- exp(post$b_sigma_Intercept)
+  
+  #convert alpha
+  delta = alpha / sqrt(1 + alpha^2);
+  omega = sigma / (sqrt(1 - sqrt(2 / pi)^2 * delta^2) );
+
+  #use it to calculate mu
+  mu = intercept - omega * delta * sqrt(2 / pi)
+  
+  #create array
+  array_post <- matrix(c(alpha,intercept,sigma,delta,omega,mu),ncol = 6,nrow=length(alpha), dimnames = list(NULL,c("alpha","intercept","sigma","delta","omega","mu")) )
+  
+  
+  #get the erf function
+  erf_part <- function(array_post,i,y){
+   return (1 + erf(array_post[i,"alpha"]*( (y - array_post[i,"mu"])/(array_post[i,"omega"]* sqrt(2) ) ) ) )
+  }
+  
+  norm_part <- function(array_post,i,y){
+   return ( (1/(array_post[i,"omega"]*sqrt(2*pi))) * exp(-0.5*(  ((y-array_post[i,"mu"])/(array_post[i,"omega"]))^2  )) )
+  }
+  
+  #calculate performance
+  df_perf_b<-calc_perf(obs=obs, post=array_post, samples=samples)
+  
+  return(df_perf_b)
+}
+
+```
+
+Plot the challenge faced during each song
+```{r challenge songs}
+
+#choose model
+fit<-fit.gap.alpha
+
+#calculate the constraint at each point for bird 2 and 18
+df_temp_per <- fit.gap.alpha$data
+df_temp_per <- df_temp_per %>% filter(Bird==2 | Bird == 18)
+p.bird.2.18<-ggplot(df_temp_per, aes(x=gap *gap_scaled_sd  + gap_scaled_mu, group=Bird, color=factor(Bird), fill=factor(Bird) ))  +geom_density( alpha=0.5)  + theme_bw() + labs(color="Bird",fill="Bird", y="Density", x="Gap length performance") 
+p.bird.2.18
+
+
+#calculate the challenge
+df_temp_per <- fit.gap.alpha$data
+df_temp_per <- df_temp_per %>% filter(Bird==2)
+song_out <- df_temp_per$gap
+df_perf_2 <-performance_simple_bird(fit=fit.gap.alpha ,obs=song_out, bird=2, samples=1)
+
+p.bird.2.perf<-ggplot(df_perf_2, aes(x=obs*gap_scaled_sd  + gap_scaled_mu,y=V1 )) + geom_point(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Challenge", x="Bird 2 songs: GapLenPerf" )
+
+
+#calculate the challenge
+df_temp_per <- fit.gap.alpha$data
+df_temp_per <- df_temp_per %>% filter(Bird==18)
+song_out <- df_temp_per$gap
+df_perf_18 <-performance_simple_bird(fit=fit.gap.alpha ,obs=song_out, bird=18, samples=1)
+
+p.bird.18.perf<-ggplot(df_perf_18, aes(x=obs*gap_scaled_sd  + gap_scaled_mu,y=V1 )) + geom_point(fill="blue", alpha=0.5)  + theme_bw() + labs(y="Challenge", x="Bird 18 songs: GapLenPerf" )
+
+#comb
+df_perf_2$bird = 2
+df_perf_18$bird = 18
+df_perf_comb <- bind_rows(df_perf_18, df_perf_2)
+
+p.bird.both.perf<-ggplot(df_perf_comb %>% sample_n(500), aes(x=obs*gap_scaled_sd  + gap_scaled_mu,y=V1, group=factor(bird), color=factor(bird) )) + geom_point(alpha=1, size=1)  + theme_bw() + labs(y="Challenge [0-1]", x="Gap length performance" , color="Bird")
+
+p.bird.both.perf
+
+#plot all together
+cowplot::plot_grid(p.bird.2.18+xlim(-50,50),p.bird.both.perf+xlim(-50,50), nrow=2)
+```
+
+
+
+# 4. Simulated data with different alpha values 
+
+For help visualizing the effect of alpha on the skew normal distribution
+
+```{r}
+#Function to play around with alpha, mu, sd
+constraint_line_sim <- function(alpha=1, mu=1, sd=1, span=4){
+    
+  #get posterior samples for parameters
+  alpha <- alpha
+  intercept <-  mu
+  sigma <- exp(sd)
+  
+  #convert alpha
+  delta = alpha / sqrt(1 + alpha^2);
+  omega = sigma / (sqrt(1 - sqrt(2 / pi)^2 * delta^2) );
+
+  #use it to calculate mu
+  mu = intercept - omega * delta * sqrt(2 / pi)
+  
+  #create array
+  array_post <- matrix(c(alpha,intercept,sigma,delta,omega,mu),ncol = 6,nrow=length(alpha), dimnames = list(NULL,c("alpha","intercept","sigma","delta","omega","mu")) )
+  
+  
+  #get the erf function
+  erf_part <- function(array_post,i,y){
+   return (1 + erf(array_post[i,"alpha"]*( (y - array_post[i,"mu"])/(array_post[i,"omega"]* sqrt(2) ) ) ) )
+  }
+  
+  norm_part <- function(array_post,i,y){
+   return ( (1/(array_post[i,"omega"]*sqrt(2*pi))) * exp(-0.5*(  ((y-array_post[i,"mu"])/(array_post[i,"omega"]))^2  )) )
+  }
+  
+  df_plots <- data.frame()
+  for(i in 1:1){
+    for(y in seq(from=-span,to=span,by=0.01) ){
+      cons<-erf_part(array_post,i,y)  
+      norm<-norm_part(array_post,i,y)  
+      full_skew <- dskew_normal(x=y, mu=mean(array_post[,"intercept"]), sigma =  mean(array_post[,"sigma"]), alpha=mean(array_post[,"alpha"]))
+      df_plots <- bind_rows(df_plots, data.frame(norm=norm,cons=(2-cons)/(2-0),skew=full_skew, i=i,y=y) )
+    }
+  }
+  
+  return(df_plots)
+}
+
+
+#### Now get a constraint line for males/females and 20/40 year olds
+df_temp0 <- constraint_line_sim(alpha=0,mu=0,sd=1, span=15)
+df_temp2 <- constraint_line_sim(alpha=5,mu=0,sd=1, span=15)
+df_tempM2 <- constraint_line_sim(alpha=-5,mu=0,sd=1, span=15)
+
+df_temp0$alpha <- 0
+df_temp2$alpha <- 5
+df_tempM2$alpha <- -5
+
+df_temp <- bind_rows(df_temp0, df_temp2, df_tempM2)
+df_temp$grp <- paste0(df_temp$alpha,"_",df_temp$i) 
+#### Now plot it all
+p.sim <- ggplot(df_temp, aes(x=y, y=cons, group=factor(grp) ) ) + geom_line(aes(x=y, y = skew*5), alpha=1, size=2, color="grey20")+ geom_line(alpha=0.8, size=1, color="red") + theme_bw() + labs(x="Performance")  + geom_line(aes(x=y, y = norm*5), size=1, alpha=0.8, color="blue")  + facet_wrap(~ alpha) +
+  
+  scale_y_continuous(
+    
+    # Features of the first axis
+    name = "Challenge [0-1]",
+    
+    # Add a second axis and specify its features
+    sec.axis = sec_axis( trans=~./5, name="Density")
+  )
+
+#take a look
+p.sim
+
+
+```
