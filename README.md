@@ -4,7 +4,7 @@ Animal displays often involve extreme behaviors that seem to push signalers to t
 
 
  <p align="center">
-<img src="https://github.com/tbonne/skewnormal/blob/main/data/fig_cons_line_mar20.png" width="25%" height="25%" align="center">
+<img src="https://github.com/tbonne/skewnormal/blob/main/data/fig_cons_line_mar20.png" width="75%" height="75%" align="center">
    </p>
 
 *Figure 3. Constraint curves extracted from skew normal distribution models: a) plot of the constraint curve for a 20-year-old male/female, and 60-year-old male/female, b) constraint curves for five birds, and c) constraint curve for bird 2 at different times of the day. The five birds selected for b) were chosen because they had the largest samples (> 6000 notes / bird).* 
