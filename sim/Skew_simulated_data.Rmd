@@ -1,0 +1,213 @@
+---
+title: "Test skew normal distribution with skewed data"
+output: html_notebook
+---
+
+# 1. Simulated raw data
+
+1.1 Let's simulate some data to then model using the skew normal and see if we can recapture the right values.
+
+```{r}
+n_sim= 1000
+
+obs_beha <- data.frame()
+
+#build some constraint on performance 
+const_func <- function(x,conf, mean){
+  if(x>mean & conf==0){
+    return (x/(1+0.5*(x-mean) ))
+  } else if (x>mean & conf==1){
+    return (x/(1+0.1*(x-mean) ))
+  } else {
+    return (x)
+  }
+  
+}
+
+for(i in 1:n_sim){
+  
+  #add a confound: high and low res conditions
+  high_res = 0
+  if(i<n_sim/2) high_res=1
+  
+  #perform a target behaviour (i.e., ideal performance)
+  beha_ideal <- rnorm(1,0,1)
+  if(i<n_sim/2) beha_ideal <- rnorm(1,1,1)
+  
+  #add a constraint (i.e., realized performance)
+  beha_const <- const_func(beha_ideal, conf=high_res, mean=high_res) #low res environment
+  
+  #store beha
+  obs_beha <- bind_rows(obs_beha, data.frame(beha = beha_const, res_high = high_res) )
+  
+}
+
+#Show all the data... and how it combines
+#par(mfrow=c(3,1))
+#hist(obs_beha[obs_beha$res_high==0,]$beha, xlim = c(-4,4))
+#hist(obs_beha[obs_beha$res_high==1,]$beha, xlim = c(-4,4))
+#hist(obs_beha$beha, xlim = c(-4,4))
+
+library(cowplot)
+plot_grid(ggplot(obs_beha[obs_beha$res_high==0,], aes(x=beha)) + geom_histogram(fill="blue", alpha=0.5) + theme_bw() + labs(x="Performance", y="Count", title = paste0("Low resource group"),subtitle=paste0("Skewness = ",round(skewness(obs_beha[obs_beha$res_high==0,]$beha),2)) )+xlim(-4,4),
+          ggplot(obs_beha[obs_beha$res_high==1,], aes(x=beha)) + geom_histogram(fill="blue", alpha=0.5) + theme_bw()+ labs(x="Performance", y="Count", title = paste0("High resource group"),subtitle=paste0("Skewness = ",round(skewness(obs_beha[obs_beha$res_high==1,]$beha),2)) )+xlim(-4,4),
+          ggplot(obs_beha, aes(x=beha)) + geom_histogram( fill="blue", alpha=0.5) + theme_bw()+ labs(x="Performance", y="Count", title = paste0("Both groups combined"),subtitle=paste0("Skewness = ",round(skewness(obs_beha$beha),2)) )+xlim(-4,4),
+          nrow = 3,
+          labels = c("a)","b)","c)")
+          )
+```
+1.2  Get a skewness estimate from the raw simulated data
+
+```{r}
+obs_skew <-skewness(obs_beha$beha)
+
+vec_skew <- vector()
+
+for(i in 1:1000){
+  vec_skew[length(vec_skew)+1]<-skewness(sample(obs_beha$beha,replace = T))
+}
+
+#hist(vec_skew)
+#abline(v=obs_skew, col="red")
+
+skew_ci<-HDInterval::hdi(vec_skew)
+skew_mean <- mean(vec_skew)
+print(paste0("Obs skew = ", round(skew_mean,2), "  [",round(skew_ci[1],2),", ",round(skew_ci[2],2),"]") )
+```
+
+# 2. Use skew normal to model the data
+
+2.1 Model the simulated data (not accounting for the confound in alpha)
+
+```{r}
+#build formula
+bf_skew <- bf(beha ~  res_high , sigma ~ 1  , alpha ~ 1 , family="skew_normal")
+
+#check and set priors
+my_priors<-get_prior(bf_skew, data= obs_beha)
+my_priors[1,1] <- "normal(0,1)"
+
+#run the model
+fit.sim_simple <- brm(bf_skew, data=obs_beha, iter = 2000, chains=4, cores = 4, prior = my_priors, backend = "cmdstanr", threads = threading(2))
+
+#check the summary
+summary(fit.sim_simple)
+```
+
+2.2 Model the simulated data (accounting for the confound in alpha)
+
+```{r}
+#build formula
+bf_skew <- bf(beha ~  res_high , sigma ~ 1  , alpha ~ 1 + res_high , family="skew_normal")
+
+#check and set priors
+my_priors<-get_prior(bf_skew, data= obs_beha)
+my_priors[1,1] <- "normal(0,1)"
+my_priors[4,1] <- "normal(0,1)"
+
+
+#run the model
+fit.sim <- brm(bf_skew, data=obs_beha, iter = 2000, chains=4, cores = 4, prior = my_priors, backend = "cmdstanr", threads = threading(2))
+
+#check the summary
+summary(fit.sim)
+```
+
+2.3 Compare modeled vs. non-modeled alpha
+
+```{r}
+loo_sim <- loo(fit.sim_simple)
+loo_sim_alpha <- loo(fit.sim)
+
+loo_sim <- loo_compare(loo_sim, loo_sim_alpha )
+loo_sim
+```
+
+Suggests that accounting for the confound in alpha helps!
+
+
+# 3. Interpret the results using the constraint line
+
+Plot constraint line for each resource value
+
+```{r resource constraint lines}
+
+#build constraint model for a particular bird
+constraint_line_simple_resource <- function(fit, res, span=4,reps=1){
+    
+  #get posterior samples for parameters
+  post <- as_draws_df(fit, ndraws=10)
+  
+  #calculate parameters based on model equation and input values
+  alpha <- post$b_alpha_Intercept + post$b_alpha_res_high * res 
+  intercept <-  post$Intercept + post$b_res_high * res
+  sigma <- exp(post$b_sigma_Intercept)
+  
+  #convert alpha
+  delta = alpha / sqrt(1 + alpha^2);
+  omega = sigma / (sqrt(1 - sqrt(2 / pi)^2 * delta^2) );
+
+  #use it to calculate mu
+  mu = intercept - omega * delta * sqrt(2 / pi)
+  
+  #create array
+  array_post <- matrix(c(alpha,intercept,sigma,delta,omega,mu),ncol = 6,nrow=length(alpha), dimnames = list(NULL,c("alpha","intercept","sigma","delta","omega","mu")) )
+  
+  
+  #get the erf function
+  erf_part <- function(array_post,i,y){
+   return (1 + erf(array_post[i,"alpha"]*( (y - array_post[i,"mu"])/(array_post[i,"omega"]* sqrt(2) ) ) ) )
+  }
+  
+  norm_part <- function(array_post,i,y){
+   return ( (1/(array_post[i,"omega"]*sqrt(2*pi))) * exp(-0.5*(  ((y-array_post[i,"mu"])/(array_post[i,"omega"]))^2  )) )
+  }
+  
+  df_plots <- data.frame()
+  for(i in 1:reps){
+    for(y in seq(from=-span,to=span,by=0.01) ){
+      cons<-erf_part(array_post,i,y)  
+      norm<-norm_part(array_post,i,y)  
+      full_skew <- dskew_normal(x=y, mu=mean(array_post[,"intercept"]), sigma =  mean(array_post[,"sigma"]), alpha=mean(array_post[,"alpha"]))
+      df_plots <- bind_rows(df_plots, data.frame(norm=norm,cons=(2-cons)/(2-0),skew=full_skew, i=i,y=y, res=res) )
+    }
+  }
+  
+  return(df_plots)
+}
+
+```
+
+Plot the constraint lines!
+```{r}
+#choose model
+fit<-fit.sim
+
+#### Now get a constraint line for each resource condition
+df_temp <- constraint_line_simple_resource(fit, res = 0, reps=30)
+df_temp <- bind_rows(df_temp, constraint_line_simple_resource(fit, res = 1, reps=30) )
+
+#### Now plot it all
+df_temp$res_f <- factor(df_temp$res)
+df_temp$group <- paste0(df_temp$i,"_",df_temp$res)
+
+
+p.const.res <- ggplot(df_temp, aes(x=y, y=cons, group=group,color=res_f ) ) + geom_line(alpha=0.3) + theme_bw() + labs(x="Simulated behaviour", y="Constraint [0-1]", color="High Resources")
+p.const.res
+
+#mean line and CIs
+
+df_temp$timepoint <- paste0(df_temp$i,"_",df_temp$res)
+
+df_temp$groupOut <- paste0(df_temp$y,"_",df_temp$res)
+
+df_temp_summ <- df_temp %>% group_by(groupOut) %>% summarise(meanBeha = mean(cons), lower=HDInterval::hdi(cons)[1], upper=HDInterval::hdi(cons)[2], res_f=first(res_f), y=first(y) )
+
+#plot
+p.const.res.m <- ggplot(df_temp_summ, aes(x=y, y=meanBeha, group=res_f, ymin=lower, ymax=upper) ) + geom_line(alpha=1, aes(color=res_f)) + geom_ribbon(aes(fill=res_f), alpha=0.15) + theme_bw() + labs(x="Behavioural performance", y="Constraint [0-1]", color="High Resource", fill="High Resource") + xlim(-1,5)
+
+#take a look
+p.const.res.m
+```
+
+
